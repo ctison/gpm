@@ -34,5 +34,7 @@ snapshot:
 changelog:
   filters:
     exclude:
+      - "^ci:"
       - "^docs:"
+      - "^readme:"
       - "^test:"
