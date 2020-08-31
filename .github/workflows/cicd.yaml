@@ -2,6 +2,10 @@ name: CI/CD
 
 on:
   push:
+    paths-ignore:
+      - README.md
+      - renovate.json
+      - LICENSE
   pull_request:
   workflow_dispatch:
 
