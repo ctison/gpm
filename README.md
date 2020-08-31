@@ -14,6 +14,7 @@ chmod 500 /usr/local/bin/gpm
 ## Roadmap
 
 - [ ] Logging
+- [ ] Tests
 - [ ] Configurations
   - [ ] Install location
 - [ ] Install command
