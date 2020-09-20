@@ -6,13 +6,13 @@ linters:
     - exhaustive
     - exportloopref
     - funlen
-    - gochecknoglobals
     - gochecknoinits
-    - gocognit
+    # - gocognit
     - goconst
-    - gocritic
+    # - gocritic
     - gocyclo
     - godot
+    # - goerr113
     - gofmt
     - goimports
     - golint
@@ -23,6 +23,7 @@ linters:
     - maligned
     - misspell
     - nakedret
+    # - nestif
     - nolintlint
     - prealloc
     - rowserrcheck
@@ -31,5 +32,3 @@ linters:
     - stylecheck
     - unconvert
     - unparam
-    # - goerr113
-    # - nestif

@@ -45,7 +45,7 @@ func (cli *CLI) Search(cmd *cobra.Command, args []string) error {
 		log.Fatal("Error: search github failed: ", err)
 	}
 	for _, repo := range result.Repositories {
-		fmt.Printf("%s %s %d⭐️\n", *repo.Name, *repo.FullName, repo.StargazersCount)
+		fmt.Printf("%s %s %d⭐️\n", *repo.Name, *repo.FullName, *repo.StargazersCount)
 	}
 	return nil
 }
@@ -105,10 +105,6 @@ func (cli *CLI) searchReleaseInteractive(owner, repo string) error {
 	})
 	if err != nil {
 		return fmt.Errorf(`failed to fetch releases: "%s/%s": %w`, owner, repo, err)
-	}
-	type Release struct {
-		Name string
-		Size int
 	}
 	i, err := fuzzyfinder.Find(
 		results,

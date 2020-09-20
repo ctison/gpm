@@ -1,9 +1,9 @@
 package main
 
 import (
-	"os"
+	"log"
 
-	"github.com/ctison/gpm/pkg/cmd"
+	"github.com/ctison/gpm/pkg/cli"
 )
 
 var (
@@ -11,9 +11,7 @@ var (
 )
 
 func main() {
-	cmd := cmd.NewRootCommand()
-	cmd.Version = version
-	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
+	if err := cli.New(version).Run(); err != nil {
+		log.Fatal("Error: ", err)
 	}
 }

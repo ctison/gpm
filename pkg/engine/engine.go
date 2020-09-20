@@ -3,176 +3,158 @@ package engine
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"regexp"
-	"runtime"
+	"path/filepath"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/cavaliercoder/grab"
 
 	"github.com/google/go-github/github"
+	log "github.com/sirupsen/logrus"
 )
 
 type Engine struct {
-	client *github.Client
+	log  *log.Logger
+	path string
+	gh   *github.Client
+	grab *grab.Client
 }
 
-type Release struct {
-	// Local path where release is installed. Empty if it is not.
-	Path string
-	// Values of github.com/{{.User}}/{{.Repo}}/releases/{{.Version}}/
-	User, Repo, Version string
-	Assets              []Asset
-}
-
-func (release *Release) DownloadAsset(url string) (*Asset, error) {
-	if url == "" {
-		panic("asset must have an URL to be downloaded from")
+func New(log *log.Logger) (*Engine, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find $HOME: %w", err)
 	}
-	if release.Path == "" {
-		releasePath := fmt.Sprintf("/usr/local/gpm/github.com/%s/%s/%s", release.User, release.Repo, release.Version)
-		if err := os.MkdirAll(releasePath, 0755); err != nil {
-			return nil, err
+	gpmDir := filepath.Join(homeDir, "gpm")
+	gpmDirBin := filepath.Join(gpmDir, "bin")
+	if err := os.MkdirAll(gpmDirBin, 0755); err != nil {
+		return nil, fmt.Errorf("failed to mkdir %q: %w", gpmDirBin, err)
+	}
+	return &Engine{
+		log:  log,
+		path: gpmDir,
+		gh:   github.NewClient(nil),
+		grab: grab.NewClient(),
+	}, nil
+}
+
+// Stop engine.
+func (ng *Engine) Stop() error {
+	return nil
+}
+
+// List returns installed assets.
+func (ng *Engine) List() ([]*Asset, error) {
+	binPath := filepath.Join(ng.path, "bin")
+	dir, err := os.Open(binPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %q: %w", binPath, err)
+	}
+	files, err := dir.Readdir(0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read dir %q: %w", binPath, err)
+	}
+	assets := make([]*Asset, 0, len(files))
+	for _, f := range files {
+		if f.Mode()&os.ModeSymlink != 0 {
+			path, err := os.Readlink(filepath.Join(binPath, f.Name()))
+			if err != nil {
+				ng.log.Errorf("failed to read symlink %q: %v", f.Name(), err)
+				continue
+			}
+			asset := NewAsset("", "", "", "", "")
+			asset.Path = path
+			path = strings.TrimPrefix(path, ng.path+string(filepath.Separator))
+			a := strings.Split(path, string(filepath.Separator))
+			if len(a) != 5 {
+				ng.log.Errorf("failed to map symlink to asset: %q -> %v", asset.Path, a)
+				continue
+			}
+			asset.Site = a[0]
+			asset.Owner = a[1]
+			asset.Repo = a[2]
+			asset.Version = a[3]
+			asset.Name = a[4]
+			asset.LinkName = f.Name()
+			assets = append(assets, asset)
 		}
-		release.Path = releasePath
 	}
-	asset := Asset{
-		URL: url,
-	}
-	s := strings.Split(asset.URL, "/")
-	asset.Name = s[len(s)-1]
-	asset.Path = fmt.Sprintf("%s/%s", release.Path, asset.Name)
-	if _, err := os.Stat(asset.Path); err == nil {
-		log.Printf("%s already exists: skipping.", asset.Path)
-		return &asset, nil
-	}
-	f, err := os.Create(asset.Path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	log.Printf("Start downloading %s", asset.Path)
-	resp, err := http.Get(asset.URL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return nil, err
-	}
-	return &asset, nil
+	return assets, nil
 }
 
-type Asset struct {
-	Path string
-	Name string
-	URL  string
-}
-
-func (asset *Asset) Link(path string) error {
-	os.Remove(path)
-	if err := os.Symlink(asset.Path, path); err != nil {
+// Install downloads, unpacks if needed, and links an asset.
+func (ng *Engine) Install(asset *Asset) error {
+	if err := ng.Download(asset); err != nil {
 		return err
 	}
-	if err := os.Chmod(asset.Path, 0555); err != nil {
+	if err := ng.Unpack(asset); err != nil {
+		return err
+	}
+	if err := ng.Link(asset, nil); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (release *Release) String() string {
-	return fmt.Sprintf("%s/%s@%s", release.User, release.Repo, release.Version)
-}
-
-func NewRelease(location string) (*Release, error) {
-	s := strings.Split(location, "@")
-	if len(s) > 2 {
-		return nil, fmt.Errorf("%q cannot contain more than one '@'", location)
+func (ng *Engine) Download(asset *Asset) error {
+	assetDir := filepath.Join(ng.path, "github.com", asset.Owner, asset.Repo, asset.Version)
+	if err := os.MkdirAll(assetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create dir %q: %w", assetDir, err)
 	}
-	var release Release
-	if len(s) == 2 {
-		release.Version = s[1]
-	}
-	s = strings.Split(s[0], "/")
-	if len(s) > 2 {
-		return nil, fmt.Errorf("%q cannot contain more than one '/'", location)
-	}
-	if len(s) == 1 {
-		release.Repo = s[0]
-	} else if len(s) == 2 {
-		release.User = s[0]
-		release.Repo = s[1]
-	}
-	return &release, nil
-}
-
-func NewEngine() (*Engine, error) {
-	return &Engine{
-		client: github.NewClient(nil),
-	}, nil
-}
-
-func (engine *Engine) Install(release Release) (*Release, error) {
-	var id int64
-	if release.Version == "" || release.Version == "latest" {
-		githubRelease, _, err := engine.client.Repositories.GetLatestRelease(context.Background(), release.User, release.Repo)
-		if err != nil {
-			return nil, err
-		}
-		id = githubRelease.GetID()
-		release.Version = *githubRelease.TagName
-	}
-	if id != 0 {
-		githubAssets, _, err := engine.client.Repositories.ListReleaseAssets(context.Background(), release.User, release.Repo, id, nil)
-		if err != nil {
-			return nil, err
-		}
-		re := regexp.MustCompile(fmt.Sprintf("(?i)%s", runtime.GOOS))
-		for _, githubAsset := range githubAssets {
-			if githubAsset.Name == nil || *githubAsset.Name == "" {
-				continue
-			}
-			if !re.MatchString(*githubAsset.Name) {
-				log.Printf("asset %q filtered out", *githubAsset.Name)
-			} else {
-				asset, err := release.DownloadAsset(*githubAsset.BrowserDownloadURL)
-				if err != nil {
-					return nil, err
-				}
-				if err := asset.Link(fmt.Sprintf("/usr/local/bin/%s", release.Repo)); err != nil {
-					return nil, err
-				}
-				return &release, nil
-			}
-		}
-	}
-	return &release, nil
-}
-
-func (engine *Engine) List(pattern string) ([]Release, error) {
-	panic("not implemented")
-}
-
-func (engine *Engine) Search(release Release) (local *Release, remote *Release, err error) {
-	if release.Path == "" {
-		local, err = engine.SearchLocal(release)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	remote, err = engine.SearchRemote(release)
+	ng.log.Debugf("mkdir %q", assetDir)
+	assetPath := filepath.Join(assetDir, asset.Name)
+	ghAsset, _, err := ng.gh.Repositories.GetReleaseAsset(context.Background(), asset.Owner, asset.Repo, asset.ID)
 	if err != nil {
-		return nil, nil, err
+		return fmt.Errorf("failed to fetch asset %q: %w", asset, err)
 	}
-	return
+	ng.log.Infof("Start download: %q", *ghAsset.BrowserDownloadURL)
+	_, err = grab.Get(assetDir, *ghAsset.BrowserDownloadURL)
+	if err != nil {
+		return fmt.Errorf("failed to download asset %q: %w", asset, err)
+	}
+	ng.log.Infof("successfully downloaded %q", assetPath)
+	asset.Path = assetPath
+	return nil
 }
 
-func (engine *Engine) SearchLocal(release Release) (*Release, error) {
-	panic("not implemented")
+func (ng *Engine) Unpack(asset *Asset) error {
+	buffer := make([]byte, 512)
+	f, err := os.Open(asset.Path)
+	if err != nil {
+		return fmt.Errorf("failed to open %q: %w", asset.Path, err)
+	}
+	if _, err = f.Read(buffer); err != nil {
+		f.Close()
+		return fmt.Errorf("failed to read %q: %w", asset.Path, err)
+	}
+	f.Close()
+	contentType := http.DetectContentType(buffer)
+	switch contentType {
+	case "application/octet-stream":
+		if err := os.Chmod(asset.Path, 0500); err != nil {
+			return fmt.Errorf("failed to chmod %q: %w", asset.Path, err)
+		}
+	default:
+		return fmt.Errorf("format not supported: %q: %q", contentType, asset.Path)
+	}
+	return nil
 }
 
-func (engine *Engine) SearchRemote(release Release) (*Release, error) {
-	panic("not implemented")
+func (ng *Engine) Link(asset *Asset, name *string) error {
+	if name == nil {
+		name = &asset.Repo
+	}
+	symlinkPath := filepath.Join(ng.path, "bin", *name)
+	_ = os.Remove(symlinkPath)
+	if err := os.Symlink(asset.Path, symlinkPath); err != nil {
+		return fmt.Errorf("failed to symlink %q to %q: %w", symlinkPath, asset.Path, err)
+	}
+	asset.LinkName = *name
+	ng.log.Infof("symlinked %q -> %q", symlinkPath, asset.Path)
+	return nil
 }
+
+func (ng *Engine) Prune() {}
+
+func (ng *Engine) Upgrade() {}
