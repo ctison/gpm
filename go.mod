@@ -3,7 +3,7 @@ module github.com/ctison/gpm
 go 1.15
 
 require (
-	github.com/google/go-github v17.0.0+incompatible
+	github.com/google/go-github/v33 v33.0.0
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
