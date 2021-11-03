@@ -10,6 +10,7 @@ require (
 	github.com/google/go-github/v21 v21.0.1
 	github.com/google/go-github/v22 v22.0.0
 	github.com/google/go-github/v23 v23.0.0
+	github.com/google/go-github/v24 v24.0.1
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
