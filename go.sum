@@ -144,6 +144,7 @@ github.com/google/go-github/v22 v22.0.0/go.mod h1:q9+Q/p2j+QS081HiwDq1a3BLTN89qG
 github.com/google/go-github/v23 v23.0.0/go.mod h1:A3lk/XzsIfqQcVJ64vfTyJE3Tb0yQoYyiIs1FJ6sqvQ=
 github.com/google/go-github/v24 v24.0.1/go.mod h1:CRqaW1Uns1TCkP0wqTpxYyRxRjxwvKU/XSS44u6X74M=
 github.com/google/go-github/v25 v25.1.3/go.mod h1:6z5pC69qHtrPJ0sXPsj4BLnd82b+r6sLB7qcBoRZqpw=
+github.com/google/go-github/v26 v26.1.3/go.mod h1:v6/FmX9au22j4CtYxnMhJJkP+JfOQDXALk7hI+MPDNM=
 github.com/google/go-querystring v1.0.0/go.mod h1:odCYkC5MyYFN7vkCjXpyrEuKhc/BUO6wN/zVPAxq5ck=
 github.com/google/go-querystring v1.1.0 h1:AnCroh3fv4ZBgVIf1Iwtovgjaw/GiKJo8M8yD/fhyJ8=
 github.com/google/go-querystring v1.1.0/go.mod h1:Kcdr2DB4koayq7X8pmAG4sNG59So17icRSOU623lUBU=
