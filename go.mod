@@ -7,6 +7,7 @@ require (
 	github.com/google/go-github/v18 v18.2.0
 	github.com/google/go-github/v19 v19.1.0
 	github.com/google/go-github/v20 v20.0.0
+	github.com/google/go-github/v21 v21.0.1
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
