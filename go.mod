@@ -25,6 +25,7 @@ require (
 	github.com/google/go-github/v37 v37.0.0
 	github.com/google/go-github/v38 v38.1.0
 	github.com/google/go-github/v40 v40.0.0
+	github.com/google/go-github/v41 v41.0.0
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
