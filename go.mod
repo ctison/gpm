@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/google/go-github v17.0.0+incompatible
+	github.com/google/go-github/v42 v42.0.0
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.3.0
