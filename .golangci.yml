@@ -1,35 +1,5 @@
 linters-settings:
-linters:
-  enable:
-    - bodyclose
-    - dupl
-    - exhaustive
-    - exportloopref
-    - funlen
-    - gochecknoglobals
-    - gochecknoinits
-    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-    - godot
-    - gofmt
-    - goimports
-    - golint
-    - gomodguard
-    - goprintffuncname
-    - gosec
-    - interfacer
-    - maligned
-    - misspell
-    - nakedret
-    - nolintlint
-    - prealloc
-    - rowserrcheck
-    - scopelint
-    - sqlclosecheck
-    - stylecheck
-    - unconvert
-    - unparam
-    # - goerr113
-    # - nestif
+  staticcheck:
+    checks:
+      - '*'
+      - -SA4023 # https://staticcheck.io/docs/checks#SA4023
