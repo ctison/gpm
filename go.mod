@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.6.0
 	github.com/google/go-github/v47 v47.1.0
 	github.com/hashicorp/go-getter/v2 v2.1.0
-	github.com/spf13/cobra v1.5.0
+	github.com/spf13/cobra v1.6.0
 	golang.org/x/exp v0.0.0-20220929160808-de9c53c655b9
 )
 
