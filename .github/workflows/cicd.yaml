@@ -30,11 +30,11 @@ jobs:
       - run: go test -v ./...
       - uses: golangci/golangci-lint-action@v3
       - if: "!startsWith(github.ref, 'refs/tags/v')"
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           args: build --rm-dist --snapshot
       - if: startsWith(github.ref, 'refs/tags/v')
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           args: release --rm-dist
         env:
