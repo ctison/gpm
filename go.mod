@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v0.22.1
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/google/go-github/v47 v47.1.0
+	github.com/google/go-github/v51 v51.0.0
 	github.com/hashicorp/go-getter/v2 v2.2.1
 	github.com/spf13/cobra v1.7.0
 	golang.org/x/exp v0.0.0-20220929160808-de9c53c655b9
@@ -39,8 +40,8 @@ require (
 	github.com/rivo/uniseg v0.4.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
-	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be // indirect
+	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/term v0.0.0-20220919170432-7a66f970e087 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/term v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 )
