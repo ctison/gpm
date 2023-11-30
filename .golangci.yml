@@ -1,5 +1,0 @@
-linters-settings:
-  staticcheck:
-    checks:
-      - '*'
-      - -SA4023 # https://staticcheck.io/docs/checks#SA4023
