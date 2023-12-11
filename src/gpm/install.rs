@@ -41,7 +41,10 @@ impl Default for GpmInstallOpts {
       arch: std::env::consts::ARCH.to_string(),
       os: std::env::consts::OS.to_string(),
       libc: Default::default(),
-      bin_dir: "~/local/bin".into(),
+      bin_dir: directories::UserDirs::new()
+        .unwrap()
+        .home_dir()
+        .join(".local/bin"),
     }
   }
 }
@@ -128,32 +131,91 @@ pub async fn install(opts: Option<GpmInstallOpts>) -> Result<()> {
     return Err(anyhow!("Multiple assets found for {arch} {os}"));
   }
 
-  let release_dir = ["~/.cache/gpm", &opts.repo, &release.tag_name]
-    .iter()
-    .collect::<PathBuf>();
+  let release_dir = directories::UserDirs::new().unwrap().home_dir().join(
+    [".cache/gpm", &opts.repo, &release.tag_name]
+      .iter()
+      .collect::<PathBuf>(),
+  );
   let download_dir = release_dir.join("download");
-  fs::create_dir_all(&download_dir).await?;
+  std::fs::create_dir_all(&download_dir)?;
   let asset_path = download_dir.join(&assets[0].name);
 
   info!("Downloading {} asset to {asset_path:?}", &assets[0].name);
-  // TODO: Download asset
+  let client = reqwest::Client::new();
+  let mut request = client.get(assets[0].browser_download_url.clone());
+  let mut file = std::fs::OpenOptions::new()
+    .append(true)
+    .create(true)
+    .open(&asset_path)?;
+  if let Ok(metadata) = file.metadata() {
+    if metadata.len() > 0 {
+      request = request.header("Range", format!("bytes={}-", metadata.len()));
+    }
+  }
+  let mut response = request.send().await?;
+  let mut i = 0;
+  while let Some(chunk) = response.chunk().await? {
+    i += 1;
+    file.write_all(&chunk)?;
+  }
+  debug!("Wrote {} chunks", &i);
+  if let Ok(metadata) = file.metadata() {
+    if metadata.len() != assets[0].size as u64 {
+      return Err(anyhow!(
+        "Downloaded asset size ({}) does not match expected size ({})",
+        metadata.len(),
+        assets[0].size
+      ));
+    }
+  }
   info!("Saved asset to {asset_path:?}");
 
   let extract_path = release_dir.join("extract");
-  fs::create_dir_all(&extract_path).await?;
 
-  fs::create_dir_all(&opts.bin_dir).await?;
+  std::fs::create_dir_all(&opts.bin_dir)?;
 
   // TODO: Extract & Link
-  if [".tar.gz", ".tar.xz", ".tgz"]
-    .iter()
-    .any(|filetype| assets[0].name.ends_with(filetype))
-  {
-    info!("Extracting tarball");
-  } else if assets[0].name.ends_with(".zip") {
-    info!("Extracting zip");
+  let drop_stdout = gag::Gag::stdout().unwrap();
+  if decompress::can_decompress(&asset_path) {
+    std::fs::create_dir_all(&extract_path)?;
+    drop(drop_stdout);
+    info!("Decompressing {asset_path:?}");
+    let drop_stdout = gag::Gag::stdout().unwrap();
+    let files = decompress::list(
+      &asset_path,
+      &decompress::ExtractOptsBuilder::default().build()?,
+    )?;
+    let mut decompressed_files = Vec::with_capacity(files.entries.len());
+
+    for file in files.entries {
+      match decompress::decompress(
+        &asset_path,
+        &extract_path,
+        &decompress::ExtractOptsBuilder::default()
+          .filter(move |path| path == Path::new(&file))
+          .build()?,
+      ) {
+        Err(err) => {
+          if let decompress::DecompressError::IO(err) = err {
+            if err.kind() != std::io::ErrorKind::AlreadyExists {
+              return Err(err.into());
+            }
+          }
+        }
+        Ok(decompressed_file) => {
+          decompressed_files.push(decompressed_file.files[0].clone());
+        }
+      };
+    }
+
+    drop(drop_stdout);
+
+    for file in decompressed_files {
+      debug!("Decompressed file: {:?}", file);
+      link_binary(&file, opts.bin_dir.as_path())?;
+    }
   } else {
-    info!("Linking binary");
+    link_binary(&asset_path, &opts.bin_dir)?;
   }
 
   Ok(())
@@ -161,6 +223,7 @@ pub async fn install(opts: Option<GpmInstallOpts>) -> Result<()> {
 
 static FILTER_PATTERNS: &[&str] = &[
   ".txt",
+  "md",
   ".sha256",
   ".md5",
   ".shasum",
@@ -181,6 +244,57 @@ static FILTER_PATTERNS: &[&str] = &[
   ".8",
   ".vsix",
 ];
+
+fn link_binary<P: AsRef<Path>, Q: AsRef<Path>>(file: P, bin_dir: Q) -> Result<()> {
+  let file = file.as_ref();
+
+  let mime = infer::get_from_path(file)?
+    .ok_or_else(|| {
+      anyhow!(
+        "Could not infer mime type from file: {file:?}",
+        file = file.display()
+      )
+    })?
+    .mime_type();
+
+  debug!("Mime type of {file:?}: {mime}");
+
+  #[cfg(target_family = "windows")]
+  if mime != "application/vnd.microsoft.portable-executable" {
+    return Ok(());
+  }
+
+  #[cfg(target_os = "macos")]
+  if mime != "application/x-mach-binary" {
+    return Ok(());
+  }
+
+  #[cfg(all(target_family = "unix", not(target_os = "macos")))]
+  if mime != "application/x-executable" {
+    return Ok(());
+  }
+
+  let link_path = bin_dir.as_ref().join(
+    Path::new(file)
+      .file_name()
+      .with_context(|| format!("Could not get file name from path: {file:?}"))?,
+  );
+
+  #[cfg(target_family = "windows")]
+  let symlink_result = std::os::windows::fs::symlink_file(&file, &link_path)?;
+
+  #[cfg(target_family = "unix")]
+  let symlink_result = std::os::unix::fs::symlink(&file, &link_path);
+
+  if let Err(err) = symlink_result {
+    if err.kind() != std::io::ErrorKind::AlreadyExists {
+      return Err(err.into());
+    }
+  }
+
+  info!("Created symbolic link: {:?}", link_path);
+  Ok(())
+}
 
 #[cfg(test)]
 mod tests {

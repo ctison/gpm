@@ -17,3 +17,8 @@ crossterm = "0.27.0"
 json_to_table = "0.6.0"
 serde = "1.0.193"
 serde_json = { version = "1.0.108", features = ["preserve_order"] }
+
+decompress = "0.6.0"
+gag = "1.0.0"
+directories = "5.0.1"
+infer = "0.15.0"
